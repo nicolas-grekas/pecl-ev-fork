@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    name: Build and test on PHP ${{ matrix.php }}
+    name: PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -20,8 +20,7 @@ jobs:
       image: php:${{ matrix.php }}-cli
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
       - name: Build and run tests
         shell: bash
@@ -41,7 +40,18 @@ jobs:
           echo 'extension=ev.so' > /usr/local/etc/php/conf.d/z-ev.ini
 
           NO_INTERACTION=1 \
-            TEST_PHP_EXECUTABLE=$(which php) \
+            TEST_PHP_EXECUTABLE="$(which php)" \
             php run-tests.php
 
           docker-php-source delete
+
+  ci:
+    name: CI
+    if: always()
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check matrix result
+        run: |
+          test '${{ needs.test.result }}' = 'success'
