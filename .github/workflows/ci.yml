@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Build and test on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - "8.5.2"
+          - "8.3.10"
+
+    container:
+      image: php:${{ matrix.php }}-cli
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build and run tests
+        shell: bash
+        run: |
+          docker-php-ext-install sockets
+
+          sockets_ini=$(php -i | grep -m 1 -o -E '/.*sockets\.ini')
+          test -z "$sockets_ini" || \
+            mv -v "$sockets_ini" "$(echo "$sockets_ini" | sed -e 's/sockets.ini/0-sockets.ini/')"
+
+          docker-php-source extract
+
+          phpize
+          ./configure --enable-ev
+          make install
+
+          echo 'extension=ev.so' > /usr/local/etc/php/conf.d/z-ev.ini
+
+          NO_INTERACTION=1 \
+            TEST_PHP_EXECUTABLE=$(which php) \
+            php run-tests.php
+
+          docker-php-source delete
